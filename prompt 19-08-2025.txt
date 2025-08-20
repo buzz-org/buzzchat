@@ -1,0 +1,4 @@
+1) i want another filter tab called "Personal" where it will consists of single chats,
+2) add event to chat-item-avatar, chat-avatar and create a design like i have attached a refrence image and develop that.
+3) add event to chat-details in the main-chat and design a modal event just like active sessions, new group lauout and i attached a layout image for that too and in that display the left part like the image i attached with the name "Left part" and in the right if the chat is group then make request like action = get_group_users(5 members/ only you) or if single then action = get_common_groups( 5 Groups in common/No groups in common) and till the response comes show the spinner/loader.
+4) only add voice call icon and video call icon wherever its there and add click event and when clicking display new feature coming soon for now

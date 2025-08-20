@@ -1,0 +1,199 @@
+$host = "192.168.0.82";
+$user = "scriptcase";
+$password = "Scriptcase@123";
+$database = "test";
+
+// $host = "192.168.0.92";
+// $user = "root";
+// $password = "new123";
+// $database = "salesforce_test";
+
+$tempPath = "/opt/Scriptcase/v9-php81/wwwroot/scriptcase/app/ErpExe/Uploads/temp/";
+
+// try {
+//     // Connect to MySQL
+//     $conn = new PDO("mysql:host=$host;dbname=$database", $user, $password);
+//     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+//     $conn->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+
+//     // Get file ID from URL
+//     $fileId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+//     if ($fileId <= 0) {
+//         throw new Exception('Invalid file ID');
+//     }
+
+//     // Retrieve file metadata
+//     $stmt = $conn->prepare("SELECT file_name FROM files WHERE id = :id");
+//     $stmt->bindParam(':id', $fileId, PDO::PARAM_INT);
+//     $stmt->execute();
+//     $file = $stmt->fetch(PDO::FETCH_ASSOC);
+
+//     if (!$file) {
+//         throw new Exception('File not found');
+//     }
+
+//     $fileName = $file['file_name'];
+
+//     // Set headers (Content-Length omitted for streaming)
+//     header('Content-Type: application/zip');
+//     header('Content-Disposition: attachment; filename="' . basename($fileName) . '"');
+//     header('Cache-Control: no-cache, must-revalidate');
+//     header('Pragma: no-cache');
+
+//     // Stream file data
+//     $stmt = $conn->prepare("SELECT file_data FROM files WHERE id = :id");
+//     $stmt->bindParam(':id', $fileId, PDO::PARAM_INT);
+//     $stmt->execute();
+//     $stmt->bindColumn('file_data', $lob, PDO::PARAM_LOB);
+//     $stmt->fetch(PDO::FETCH_BOUND);
+
+//     if (is_resource($lob)) {
+//         // Stream LOB resource
+//         while (!feof($lob)) {
+//             echo fread($lob, 8192); // 8KB chunks
+//             flush();
+//         }
+//         fclose($lob);
+//     } else {
+//         // Direct output if not a resource
+//         echo $lob;
+//     }
+
+// } catch (PDOException $e) {
+//     http_response_code(500);
+//     echo 'Database error: ' . $e->getMessage();
+// } catch (Exception $e) {
+//     http_response_code(404);
+//     echo 'Error: ' . $e->getMessage();
+// }
+
+// $conn = null;
+
+ini_set('memory_limit', '256M'); // Low limit to rely on streaming
+
+try {
+    // Connect to MySQL
+    $conn = new mysqli($host, $user, $password, $database);
+    if ($conn->connect_error) {
+        throw new Exception('Database connection failed: ' . $conn->connect_error, 500);
+    }
+
+    // Ensure temp directory exists
+    if (!is_dir($tempPath)) {
+        mkdir($tempPath, 0775, true);
+    }
+
+    // Get file ID and action from URL
+    $action = isset($_GET['action']) ? $_GET['action'] : 'metadata';
+
+if ($action === 'metadata') {
+	$fileId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    if ($fileId <= 0) {
+        throw new Exception('Invalid file ID', 404);
+    }
+    $stmt = $conn->prepare("SELECT file_name, LENGTH(file_data) AS file_size FROM files WHERE id = ?");
+    $stmt->bind_param("i", $fileId);
+    $stmt->execute();
+    $stmt->bind_result($fileName, $fileSize);
+    $stmt->fetch();
+    $stmt->close();
+
+    if (!$fileName) {
+        throw new Exception('File not found', 404);
+    }
+
+    // Insert chunks into `chunks` table using recursive query
+    $insertChunksQuery = "
+        INSERT IGNORE INTO `chunks` (`unique_id`, `chunk_index`, `chunk_data`)
+        WITH RECURSIVE chunk_offsets AS (
+            SELECT 1 AS start_pos
+            UNION ALL
+            SELECT start_pos + 1048576
+            FROM chunk_offsets
+            WHERE start_pos + 1048576 <= (
+                SELECT OCTET_LENGTH(file_data) FROM files WHERE id = ?
+            )
+        )
+        SELECT 
+            ?,
+            (start_pos - 1) / 1048576,
+            SUBSTRING(file_data, start_pos, 1048576) AS chunk_data
+        FROM chunk_offsets
+        JOIN files ON id = ?;
+    ";
+
+    $stmt = $conn->prepare($insertChunksQuery);
+    if (!$stmt) {
+        throw new Exception('Prepare failed: ' . $conn->error, 500);
+    }
+    $stmt->bind_param("iii", $fileId, $fileId, $fileId);
+    $stmt->execute();
+    $stmt->close();
+
+    header('Content-Type: application/json');
+    echo json_encode([
+        'status' => 'success',
+        'fileName' => $fileName,
+        'fileSize' => $fileSize,
+        'uniqueId' => $fileId
+    ]);
+} elseif ($action === 'chunk') {
+    $uniqueId = isset($_GET['uniqueId']) ? (int)$_GET['uniqueId'] : 0;
+    $chunkIndex = isset($_GET['chunkIndex']) ? (int)$_GET['chunkIndex'] : 0;
+	$totalChunks = isset($_GET['totalChunks']) ? (int)$_GET['totalChunks'] : 0;
+
+    if ($uniqueId <= 0) {
+		echo json_encode(['status' => 'error', 'message' => 'Invalid unique ID']);
+		exit;
+    }
+
+    $stmt = $conn->prepare("SELECT chunk_data FROM chunks WHERE unique_id = ? AND chunk_index = ?");
+    if (!$stmt) {
+		echo json_encode(['status' => 'error', 'message' => 'Prepare failed']);
+		exit;
+    }
+    $stmt->bind_param("ii", $uniqueId, $chunkIndex);
+    $stmt->execute();
+    $stmt->bind_result($chunkData);
+	$stmt->fetch()
+	$stmt->close();
+
+    if (!$chunkData) {
+		echo json_encode(['status' => 'error', 'message' => 'Chunk not found']);
+		exit;
+    }
+	if ( $totalChunks - 1 == $chunkIndex ) {
+		// Delete chunks using function
+		deleteChunks($conn, $uniqueId);
+	}
+	
+    // header('Content-Type: application/octet-stream');
+	echo base64_encode($chunkData);
+} else {
+		echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
+    }
+
+} catch (Exception $e) {
+    // http_response_code($e->getCode() ?: ($conn->connect_error ? 500 : 404));
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+}
+
+$conn->close();
+
+function deleteChunks($conn, $uniqueId) {
+    try {
+        $stmt = $conn->prepare("DELETE FROM chunks WHERE unique_id = ?");
+        if (!$stmt) {
+            throw new Exception('Failed to prepare DELETE statement: ' . $conn->error);
+        }
+        $stmt->bind_param("s", $uniqueId);
+        if (!$stmt->execute()) {
+            throw new Exception('Failed to execute DELETE statement: ' . $stmt->error);
+        }
+        $stmt->close();
+        return true;
+    } catch (Exception $e) {
+        throw $e; // Rethrow to be caught by the caller
+    }
+}

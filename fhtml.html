@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket File Upload</title>
+  <link rel="stylesheet" href="fstyle.css">
+</head>
+<body>
+  <progress id="progressBar1" value="0" max="100"></progress>
+  <span id="progressPercent1">0%</span>
+  <div id="uploadStatus"></div>
+
+  <div class="container">
+    <h1>File Upload + Message via WebSocket</h1>
+    <textarea id="message" placeholder="Type your message"></textarea>
+    <input type="file" id="fileInput" multiple>
+    <button id="submitBtn">Upload</button>
+    <div id="status1"></div>
+  </div>
+
+  <progress id="progressBar" value="0" max="100"></progress>
+  <span id="progressPercent">0%</span>
+  <div id="downloadStatus"></div>
+
+  <script src="fscript.js"></script>
+
+  <div class="container">
+    <h2>File Download via WebSocket</h2>
+    <input type="text" id="downloadFileId" placeholder="Enter File ID">
+    <button id="downloadBtn">Download</button>
+    <div id="status2"></div>
+  </div>
+  
+  <script src="dscript.js"></script>
+</body>
+</html>

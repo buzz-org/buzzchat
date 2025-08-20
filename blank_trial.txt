@@ -1,0 +1,300 @@
+$host = "192.168.0.82";
+$user = "scriptcase";
+$password = "Scriptcase@123";
+$database = "test";
+$tempPath = "/opt/Scriptcase/v9-php81/wwwroot/scriptcase/app/ErpExe/Uploads/temp/";
+
+// $host = "192.168.0.92";
+// $user = "root";
+// $password = "new123";
+// $database = "salesforce_test";
+
+// Increase memory limit as a fallback
+ini_set('memory_limit', '256M'); // Lowered to encourage streaming
+
+// try {
+//     // Connect to MySQL
+//     $conn = new PDO("mysql:host=$host;dbname=$database", $user, $password);
+//     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+//     $conn->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false); // Disable buffering
+
+//     // Ensure temp directory exists and is writable
+//     if (!is_dir($tempPath)) {
+//         mkdir($tempPath, 0775, true);
+//     }
+
+//     // Handle chunk upload
+//     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+//         $fileName = isset($_POST['fileName']) ? basename($_POST['fileName']) : '';
+//         $chunkIndex = isset($_POST['chunkIndex']) ? (int)$_POST['chunkIndex'] : 0;
+//         $totalChunks = isset($_POST['totalChunks']) ? (int)$_POST['totalChunks'] : 1;
+//         $uniqueId = isset($_POST['uniqueId']) ? preg_replace('/[^a-zA-Z0-9]/', '', $_POST['uniqueId']) : '';
+
+//         if (empty($fileName) || empty($uniqueId)) {
+//             echo json_encode(['status' => 'error', 'message' => 'Invalid file name or unique ID']);
+//             exit;
+//         }
+
+//         // Save chunk
+//         $chunkFile = $tempPath . $uniqueId . '_' . $chunkIndex . '.part';
+//         if (isset($_FILES['chunk']) && $_FILES['chunk']['error'] === UPLOAD_ERR_OK) {
+//             move_uploaded_file($_FILES['chunk']['tmp_name'], $chunkFile);
+//         } else {
+//             echo json_encode(['status' => 'error', 'message' => 'Chunk upload failed']);
+//             exit;
+//         }
+
+//         // Check if all chunks are uploaded
+//         $allChunksUploaded = true;
+//         for ($i = 0; $i < $totalChunks; $i++) {
+//             if (!file_exists($tempPath . $uniqueId . '_' . $i . '.part')) {
+//                 $allChunksUploaded = false;
+//                 break;
+//             }
+//         }
+
+//         // Reassemble and insert into database if all chunks are received
+//         if ($allChunksUploaded) {
+//             $finalFile = $tempPath . $uniqueId . '_' . $fileName;
+//             $fileHandle = fopen($finalFile, 'wb');
+//             for ($i = 0; $i < $totalChunks; $i++) {
+//                 $chunkFile = $tempPath . $uniqueId . '_' . $i . '.part';
+//                 $chunkHandle = fopen($chunkFile, 'rb');
+//                 while (!feof($chunkHandle)) {
+//                     $buffer = fread($chunkHandle, 8192); // 8KB buffer
+//                     fwrite($fileHandle, $buffer);
+//                 }
+//                 fclose($chunkHandle);
+//                 unlink($chunkFile); // Delete chunk
+//             }
+//             fclose($fileHandle);
+
+//             // Stream file to MySQL
+//             $fileHandle = fopen($finalFile, 'rb');
+//             if ($fileHandle === false) {
+//                 throw new Exception('Failed to open final file for reading');
+//             }
+
+//             $stmt = $conn->prepare("INSERT INTO files (file_name, file_data) VALUES (:file_name, :file_data)");
+//             $stmt->bindParam(':file_name', $fileName, PDO::PARAM_STR);
+//             $stmt->bindParam(':file_data', $fileHandle, PDO::PARAM_LOB);
+//             $stmt->execute();
+
+//             fclose($fileHandle);
+//             unlink($finalFile); // Delete reassembled file
+
+//             echo json_encode(['status' => 'success', 'message' => 'File uploaded successfully']);
+//         } else {
+//             echo json_encode(['status' => 'success', 'message' => 'Chunk uploaded']);
+//         }
+//     }
+// } catch (PDOException $e) {
+//     echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+// } catch (Exception $e) {
+//     echo json_encode(['status' => 'error', 'message' => 'Server error: ' . $e->getMessage()]);
+// }
+
+// $conn = null;
+
+try {
+    // Connect to MySQL
+    $conn = new mysqli($host, $user, $password, $database);
+    if ($conn->connect_error) {
+        throw new Exception('Connection failed: ' . $conn->connect_error);
+    }
+
+    // Ensure temp directory exists and is writable
+    if (!is_dir($tempPath)) {
+        mkdir($tempPath, 0775, true);
+    }
+
+    // Handle chunk upload
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+		// Read JSON payload from php://input
+        $input = file_get_contents('php://input');
+        $data = json_decode($input, true);
+		
+		// Extract and validate metadata
+        $fileName = isset($data['fileName']) ? basename($data['fileName']) : '';
+        $chunkIndex = isset($data['chunkIndex']) ? (int)$data['chunkIndex'] : 0;
+        $totalChunks = isset($data['totalChunks']) ? (int)$data['totalChunks'] : 1;
+        $uniqueId = isset($data['uniqueId']) ? preg_replace('/[^a-zA-Z0-9]/', '', $data['uniqueId']) : '';
+        $chunkData = isset($data['chunk']) ? base64_decode($data['chunk']) : '';
+		
+        // $fileName = isset($_POST['fileName']) ? basename($_POST['fileName']) : '';
+        // $chunkIndex = isset($_POST['chunkIndex']) ? (int)$_POST['chunkIndex'] : 0;
+        // $totalChunks = isset($_POST['totalChunks']) ? (int)$_POST['totalChunks'] : 1;
+        // $uniqueId = isset($_POST['uniqueId']) ? preg_replace('/[^a-zA-Z0-9]/', '', $_POST['uniqueId']) : '';
+
+        if (empty($fileName) || empty($uniqueId)) {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid file name or unique ID']);
+            exit;
+        }
+
+        // Save chunk
+        $chunkFile = $tempPath . $uniqueId . '_' . $chunkIndex . '.part';
+        // if (isset($_FILES['chunk']) && $_FILES['chunk']['error'] === UPLOAD_ERR_OK) {
+			if (isset($data['chunk']) && $chunkData != '') {
+            // move_uploaded_file($_FILES['chunk']['tmp_name'], $chunkFile);
+			file_put_contents($chunkFile, $chunkData);
+			// exit;
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Chunk upload failed']);
+            exit;
+        }
+
+        // Check if all chunks are uploaded
+		if ( $totalChunks - 1 == $chunkIndex ) {
+        $allChunksUploaded = true;
+        for ($i = 0; $i < $totalChunks; $i++) {
+            if (!file_exists($tempPath . $uniqueId . '_' . $i . '.part')) {
+                $allChunksUploaded = false;
+            	echo json_encode(['status' => 'error', 'message' => 'Not all chunks are uploaded']);
+                exit;
+            }
+        }
+		}
+
+        // Reassemble and insert into database if all chunks are received
+        if ($allChunksUploaded) {
+            $finalFile = $tempPath . $uniqueId . '_' . $fileName;
+            $fileHandle = fopen($finalFile, 'wb');
+            for ($i = 0; $i < $totalChunks; $i++) {
+                $chunkFile = $tempPath . $uniqueId . '_' . $i . '.part';
+                $chunkHandle = fopen($chunkFile, 'rb');
+                while (!feof($chunkHandle)) {
+                    $buffer = fread($chunkHandle, 8192);
+                    fwrite($fileHandle, $buffer);
+                }
+                fclose($chunkHandle);
+                unlink($chunkFile);
+            }
+            fclose($fileHandle);
+
+            // Stream file to MySQL
+            $stmt = $conn->prepare("INSERT INTO files (file_name, file_data) VALUES (?, ?)");
+            $null = null;
+            $stmt->bind_param("sb", $fileName, $null);
+            $fileHandle = fopen($finalFile, 'rb');
+            while (!feof($fileHandle)) {
+                $chunk = fread($fileHandle, 65536); // 64KB chunks
+                $stmt->send_long_data(1, $chunk); // Stream to file_data
+            }
+            fclose($fileHandle);
+            $stmt->execute();
+            $stmt->close();
+
+            unlink($finalFile);
+
+            echo json_encode(['status' => 'success', 'message' => 'File uploaded successfully']);
+        } else {
+			echo json_encode(['status' => 'success', 'message' => 'Chunk uploaded']);
+        }
+    }
+} catch (Exception $e) {
+    echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+}
+
+$conn->close();
+
+// try {
+//     // Connect to MySQL
+//     $conn = new mysqli($host, $user, $password, $database);
+//     if ($conn->connect_error) {
+//         throw new Exception('Connection failed: ' . $conn->connect_error);
+//     }
+
+//     // Handle chunk upload
+//     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+//         // Read JSON payload from php://input
+//         $input = file_get_contents('php://input');
+//         $data = json_decode($input, true);
+
+//         // Extract and validate metadata
+//         $fileName = isset($data['fileName']) ? basename($data['fileName']) : '';
+//         $chunkIndex = isset($data['chunkIndex']) ? (int)$data['chunkIndex'] : 0;
+//         $totalChunks = isset($data['totalChunks']) ? (int)$data['totalChunks'] : 1;
+//         $uniqueId = isset($data['uniqueId']) ? preg_replace('/[^a-zA-Z0-9]/', '', $data['uniqueId']) : '';
+//         $chunkData = isset($data['chunk']) ? base64_decode($data['chunk']) : '';
+
+//         if (empty($fileName) || empty($uniqueId)) {
+//             echo json_encode(['status' => 'error', 'message' => 'Invalid file name or unique ID']);
+//             exit;
+//         }
+
+//         if ($chunkData === false || strlen($chunkData) === 0) {
+//             echo json_encode(['status' => 'error', 'message' => 'Invalid or empty chunk data']);
+//             exit;
+//         }
+
+//         // Start transaction for atomic operations
+//         $conn->begin_transaction();
+
+//         // Insert new row for the file
+//         $stmt = $conn->prepare("INSERT INTO chunks (unique_id, chunk_index, chunk_data) VALUES (?, ?, ?)");
+//         $stmt->bind_param("sis", $uniqueId, $chunkIndex, $chunkData);
+//         $stmt->execute();
+//         $stmt->close();
+
+//         if ( $totalChunks - 1 == $chunkIndex ) {
+			
+// 			// Check if all chunks are uploaded
+// 			$stmt = $conn->prepare("SELECT COUNT(*) as chunk_count FROM chunks WHERE unique_id = ?");
+// 			$stmt->bind_param("s", $uniqueId);
+// 			$stmt->execute();
+// 			$result = $stmt->get_result();
+// 			$row = $result->fetch_assoc();
+// 			$stmt->close();
+
+// 			if ( $row['chunk_count'] == $totalChunks ) {
+// 				// Call stored procedure to combine chunks and insert into files table
+//                 $stmt = $conn->prepare("CALL CombineChunksIntoFiles(?, ?)");
+//                 $stmt->bind_param("ss", $uniqueId, $fileName);
+//                 $stmt->execute();
+// 				$result = $stmt->get_result();
+// 				$col = $result->fetch_assoc();
+//                 $stmt->close();
+
+// 				// Delete chunks using function
+//                 deleteChunks($conn, $uniqueId);
+				
+// 				$conn->commit();
+// 				echo json_encode(['status' => 'success', 'message' => 'File uploaded successfully', 'size' => $col]);
+// 			} else {
+// 				// Delete chunks using function
+//                 deleteChunks($conn, $uniqueId);
+// 				$conn->commit();
+// 				echo json_encode(['status' => 'success', 'message' => 'Chunk counts mismatching..!']);
+// 			}
+// 		} else {
+// 			$conn->commit();
+// 			echo json_encode(['status' => 'success', 'message' => 'Chunk uploaded successfully']);
+// 		}
+//     }
+// } catch (Exception $e) {
+//     if (isset($conn) && $conn->ping()) {
+//         $conn->rollback();
+//     }
+//     echo json_encode(['status' => 'error', 'message' => 'Error: ' . $e->getMessage()]);
+// }
+
+// if (isset($conn)) {
+//     $conn->close();
+// }
+
+// function deleteChunks($conn, $uniqueId) {
+//     try {
+//         $stmt = $conn->prepare("DELETE FROM chunks WHERE unique_id = ?");
+//         if (!$stmt) {
+//             throw new Exception('Failed to prepare DELETE statement: ' . $conn->error);
+//         }
+//         $stmt->bind_param("s", $uniqueId);
+//         if (!$stmt->execute()) {
+//             throw new Exception('Failed to execute DELETE statement: ' . $stmt->error);
+//         }
+//         $stmt->close();
+//         return true;
+//     } catch (Exception $e) {
+//         throw $e; // Rethrow to be caught by the caller
+//     }
+// }

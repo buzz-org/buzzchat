@@ -1,0 +1,186 @@
+$host = "192.168.0.82";
+$user = "scriptcase";
+$password = "Scriptcase@123";
+$database = "test";
+$tempPath = "/opt/Scriptcase/v9-php81/wwwroot/scriptcase/app/ErpExe/Uploads/temp/";
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload ZIP File</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #progressBar {
+            width: 100%;
+            height: 20px;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        #progress {
+            height: 100%;
+            background-color: #4caf50;
+            width: 0;
+            transition: width 0.3s;
+        }
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h2>Upload ZIP File (Up to 1GB)</h2>
+    <input type="file" id="zipfile" accept=".zip">
+    <button onclick="uploadFile()">Upload</button>
+    <div id="progressBar">
+        <div id="progress"></div>
+    </div>
+    <div id="status">0%</div>
+
+    <script>
+		// Utility function to convert ArrayBuffer to base64
+        function arrayBufferToBase64(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+		
+        async function uploadFile() {
+			const startTime = new Date();
+            const fileInput = document.getElementById('zipfile');
+            const progress = document.getElementById('progress');
+            const status = document.getElementById('status');
+
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            // if (file.size > 1 * 1024 * 1024 * 1024) {
+            //     alert('File size exceeds 1GB');
+            //     return;
+            // }
+
+            const CHUNK_SIZE =  1 * 1024 * 1024; // 50MB
+            const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+            const uniqueId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+            let start = 0;
+            let uploadedChunks = 0;
+
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
+
+                // const formData = new FormData();
+                // formData.append('chunk', chunk);
+                // formData.append('fileName', file.name);
+                // formData.append('chunkIndex', chunkIndex);
+                // formData.append('totalChunks', totalChunks);
+                // formData.append('uniqueId', uniqueId);
+				
+				// Convert chunk to ArrayBuffer and then to base64
+                const chunkArrayBuffer = await chunk.arrayBuffer();
+                const chunkBase64 = arrayBufferToBase64(chunkArrayBuffer);
+				
+				// Create JSON payload
+                const payload = {
+                    chunk: chunkBase64,
+                    fileName: file.name,
+                    chunkIndex: chunkIndex,
+                    totalChunks: totalChunks,
+                    uniqueId: uniqueId
+                };
+
+                try {
+                    const response = await fetch('../blank_trial/index.php', {
+                        method: 'POST',
+                        // body: formData,
+                        // headers: {
+                        //     'Accept': 'application/json'
+                        // }
+						headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+                    if (result.status === 'error') {
+                        status.textContent = `Error: ${result.message}`;
+                        return;
+                    }
+
+                    uploadedChunks++;
+                    const percentage = Math.round((uploadedChunks / totalChunks) * 100);
+                    progress.style.width = `${percentage}%`;
+                    status.textContent = `${percentage}%`;
+
+                    if (result.status === 'success' && result.message === 'File uploaded successfully') {
+                        status.textContent = 'Upload complete!';
+                    }
+                } catch (error) {
+                    status.textContent = `Error: ${error.message}`;
+                    return;
+                }
+
+                start = end;
+            }
+			const endTime = new Date();
+
+			const diff = getDateDiff(startTime, endTime);
+
+			status.textContent += `Difference: ${diff.years} years, ${diff.months} months, ${diff.days} days, ${diff.hours} hours, ${diff.minutes} minutes, ${diff.seconds} seconds`;
+        }
+		
+		function getDateDiff(start, end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    let years = endDate.getFullYear() - startDate.getFullYear();
+    let months = endDate.getMonth() - startDate.getMonth();
+    let days = endDate.getDate() - startDate.getDate();
+    let hours = endDate.getHours() - startDate.getHours();
+    let minutes = endDate.getMinutes() - startDate.getMinutes();
+    let seconds = endDate.getSeconds() - startDate.getSeconds();
+
+    if (seconds < 0) {
+        seconds += 60;
+        minutes--;
+    }
+    if (minutes < 0) {
+        minutes += 60;
+        hours--;
+    }
+    if (hours < 0) {
+        hours += 24;
+        days--;
+    }
+    if (days < 0) {
+        const prevMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
+        days += prevMonth.getDate();
+        months--;
+    }
+    if (months < 0) {
+        months += 12;
+        years--;
+    }
+
+    return { years, months, days, hours, minutes, seconds };
+}
+    </script>
+</body>
+</html>
+<?php

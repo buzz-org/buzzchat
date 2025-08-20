@@ -1,0 +1,147 @@
+// echo ini_get('memory_limit');
+// echo ini_get('post_max_size');
+// echo ini_get('upload_max_filesize');
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download ZIP File</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #progressBar {
+            width: 100%;
+            height: 20px;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        #progress {
+            height: 100%;
+            background-color: #4caf50;
+            width: 0;
+            transition: width 0.3s;
+        }
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h2>Download ZIP File</h2>
+    <input type="number" id="fileId" placeholder="Enter File ID" min="1">
+    <button onclick="downloadFile()">Download</button>
+    <div id="progressBar">
+        <div id="progress"></div>
+    </div>
+    <div id="status">0%</div>
+
+    <script>
+        async function downloadFile() {
+			const startTime = new Date();
+            const fileIdInput = document.getElementById('fileId');
+            const progress = document.getElementById('progress');
+            const status = document.getElementById('status');
+            const fileId = parseInt(fileIdInput.value);
+
+            if (!fileId || fileId <= 0) {
+                alert('Please enter a valid File ID');
+                return;
+            }
+
+            try {
+                // Fetch metadata
+                const metadataResponse = await fetch(`../blank_test/index.php?id=${fileId}&action=metadata`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const metadata = await metadataResponse.json();
+
+                if (metadata.status === 'error') {
+                    status.textContent = `Error: ${metadata.message}`;
+                    return;
+                }
+
+                const { fileName, fileSize, uniqueId } = metadata;
+                const CHUNK_SIZE = 1 * 1024 * 1024; // 25MB
+                const totalChunks = Math.ceil(fileSize / CHUNK_SIZE);
+                const chunks = [];
+
+                // Download chunks
+                for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                    const chunkResponse = await fetch(`../blank_test/index.php?uniqueId=${uniqueId}&action=chunk&totalChunks=${totalChunks}&chunkIndex=${chunkIndex}`);
+                    const chunk = await chunkResponse.blob();
+                    chunks.push(atob(chunk));
+
+                    const percentage = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                    progress.style.width = `${percentage}%`;
+                    status.textContent = `${percentage}%`;
+                }
+
+                // Reassemble and download
+                const blob = new Blob(chunks, { type: 'application/zip' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                status.textContent = 'Download complete!';
+				
+				const endTime = new Date();
+
+				const diff = getDateDiff(startTime, endTime);
+
+				status.textContent += `Difference: ${diff.years} years, ${diff.months} months, ${diff.days} days, ${diff.hours} hours, ${diff.minutes} minutes, ${diff.seconds} seconds`;
+            } catch (error) {
+                status.textContent = `Error: ${error.message}`;
+            }
+        }
+		function getDateDiff(start, end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    let years = endDate.getFullYear() - startDate.getFullYear();
+    let months = endDate.getMonth() - startDate.getMonth();
+    let days = endDate.getDate() - startDate.getDate();
+    let hours = endDate.getHours() - startDate.getHours();
+    let minutes = endDate.getMinutes() - startDate.getMinutes();
+    let seconds = endDate.getSeconds() - startDate.getSeconds();
+
+    if (seconds < 0) {
+        seconds += 60;
+        minutes--;
+    }
+    if (minutes < 0) {
+        minutes += 60;
+        hours--;
+    }
+    if (hours < 0) {
+        hours += 24;
+        days--;
+    }
+    if (days < 0) {
+        const prevMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
+        days += prevMonth.getDate();
+        months--;
+    }
+    if (months < 0) {
+        months += 12;
+        years--;
+    }
+
+    return { years, months, days, hours, minutes, seconds };
+}
+    </script>
+</body>
+</html>
+<?php
