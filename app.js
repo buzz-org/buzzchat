@@ -642,7 +642,9 @@ class WebSocketChat {
                 }
             }, 10000); // 10 second timeout
             
-            this.ws = new WebSocket('wss://bc4d10f16e8b.ngrok-free.app');
+            // this.ws = new WebSocket('wss://bc4d10f16e8b.ngrok-free.app');
+            this.ws = new WebSocket('wss://nodejsws-67yl.onrender.com');
+            // this.ws = new WebSocket('ws://localhost:5173');
             
             this.ws.onopen = () => {
                 clearTimeout(connectionTimeout);
