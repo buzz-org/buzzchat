@@ -87,6 +87,156 @@ body {
     border: 1px solid var(--border-color);
 }
 
+.login-modal-content {
+    width: 900px;
+    max-width: 95vw;
+    position: relative;
+}
+
+.theme-toggle-container {
+    position: absolute;
+    top: 10rem;
+    right: 1rem;
+    z-index: 10;
+}
+
+.login-container {
+    display: flex;
+    gap: 2rem;
+}
+
+.signup-section,
+.signin-section {
+    flex: 1;
+}
+
+.signup-section h3,
+.signin-section h3 {
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.divider-vertical {
+    width: 1px;
+    background: var(--border-color);
+    margin: 0 1rem;
+}
+
+.oauth-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.oauth-btn:hover {
+    background: var(--bg-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
+.oauth-btn svg {
+    flex-shrink: 0;
+}
+
+.oauth-btn span {
+    flex: 1;
+    text-align: left;
+}
+
+.oauth-google:hover {
+    background: #f8f9fa;
+}
+
+.oauth-apple:hover {
+    background: #000;
+    color: #fff;
+}
+
+.oauth-facebook:hover {
+    background: #1877F2;
+    color: #fff;
+}
+
+.oauth-twitter:hover {
+    background: #000;
+    color: #fff;
+}
+
+.oauth-linkedin:hover {
+    background: #0A66C2;
+    color: #fff;
+}
+
+.oauth-yahoo:hover {
+    background: #6001D2;
+    color: #fff;
+}
+
+.oauth-microsoft:hover {
+    background: #f3f3f3;
+}
+
+.oauth-github:hover {
+    background: #24292e;
+    color: #fff;
+}
+
+.signin-section {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.signup-section {
+    max-height: 500px;
+    padding-right: 0.5rem;
+}
+
+.signup-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.signup-section::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+}
+
+.signup-section::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 3px;
+}
+
+.signup-section::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+    .login-modal-content {
+        width: 95vw;
+    }
+
+    .login-container {
+        flex-direction: column;
+    }
+
+    .divider-vertical {
+        display: none;
+    }
+}
+
 .login-header {
     text-align: center;
     margin-bottom: 2rem;

@@ -471,6 +471,17 @@ class WebSocketChat {
         // Set dark mode as default
         document.body.classList.add('dark-mode');
         this.updateDarkModeIcon(true);
+
+        // Initialize login theme toggle
+        const loginThemeToggle = document.getElementById('loginThemeToggle');
+        if (loginThemeToggle) {
+            loginThemeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-mode');
+                const isDark = document.body.classList.contains('dark-mode');
+                this.updateDarkModeIcon(isDark);
+                localStorage.setItem('darkMode', isDark);
+            });
+        }
     }
 
     /**
@@ -642,9 +653,8 @@ class WebSocketChat {
                 }
             }, 10000); // 10 second timeout
             
-            // this.ws = new WebSocket('wss://bc4d10f16e8b.ngrok-free.app');
-            this.ws = new WebSocket('wss://nodejsws-67yl.onrender.com');
-            // this.ws = new WebSocket('ws://localhost:5173');
+            // this.ws = new WebSocket('wss://nodejsws-67yl.onrender.com');
+            this.ws = new WebSocket('ws://localhost:5173');
             
             this.ws.onopen = () => {
                 clearTimeout(connectionTimeout);
@@ -2876,7 +2886,7 @@ class WebSocketChat {
     downloadFilePOST(fileId, username, sessionid) {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = 'http://localhost:8000/chatapi.php';
+        form.action = 'http://localhost:5173/chatapi.php';
         form.target = '_blank'; // Opens in new tab (like <a target="_blank">)
       
         form.style.display = 'none';
@@ -2910,6 +2920,17 @@ class WebSocketChat {
         const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
         return new TextDecoder().decode(bytes);
     }
+}
+
+// Global function to open OAuth window
+function openOAuthWindow(provider) {
+    const width = 500;
+    const height = 600;
+    const left = (screen.width - width) / 2;
+    const top = (screen.height - height) / 2;
+
+    const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+    window.open(`oauth.html?provider=${provider}`, `OAuth ${provider}`, features);
 }
 
 // Initialize the chat application when page loads

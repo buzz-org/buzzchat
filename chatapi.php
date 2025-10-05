@@ -919,17 +919,6 @@ function get_receiver_sessions($data, $db) {
 
     $action = $data['action'] ?? '';
 
-    // switch ($action) {
-    // // 1        
-    //     case 'create_group':
-            
-    //         break;
-
-    //     default:
-            
-    //         break;
-    // }
-
     $response = $db->execQuery("-- get_receiver_sessions
     SELECT ms.MsgId, ms.FileName, (CASE WHEN (ur.`Type` = '1') THEN ('Single') WHEN (ur.`Type` = '2') THEN ('Group') END) AS `ChatType`, (CASE WHEN (ur.`Type` = '1') THEN (su.`name`) ELSE ur.Room END) AS `Name`, ur.RoomId, us.SessnId, (CASE WHEN (ur.`Type` = '2') THEN (SELECT CONCAT(COUNT(*), ' Online')
     FROM user_mmbrs mm

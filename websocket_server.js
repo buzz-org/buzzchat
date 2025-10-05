@@ -27,7 +27,7 @@ app.get("/", (req, res) => {
 // Create an HTTP server
 const server = http.createServer(app);
 
-const PORT = 3000;
+const PORT = process.env.PORT || 5173;
 server.listen(PORT, () => {
   console.log(`HTTP + WS server running on http://localhost:${PORT}`);
 });
@@ -110,7 +110,7 @@ wss.on('connection', ws => {
     // Terminate associated processes
     activeProcesses.forEach((processInfo, pid) => {
       if (processInfo.ws === ws) {
-        processInfo.child.kill();
+        // processInfo.child.kill();
         activeProcesses.delete(pid);
         runningProcesses--;
         console.log(`Terminated process ${pid} due to client disconnection, , running: ${runningProcesses}`);
@@ -153,9 +153,15 @@ async function handleSendMessage(response, ws) {
   
   if (jsonData && jsonData.terminate_session && jsonData.terminate_session.terminate_session) {
     const terminate_session = jsonData.terminate_session.terminate_session;
-    const sessionIds = terminate_session.map(row => row.SessnId);
-    console.log(`Found ${sessionIds.length} active sessions:`, sessionIds);
-    for (const session of terminate_session) {
+    // const sessionIds = terminate_session.map(row => row.SessnId);
+    const terminateArray = Array.isArray(terminate_session)
+  ? terminate_session
+  : terminate_session
+  ? Object.values(terminate_session)
+  : [];
+  const sessionIds = terminateArray.map(row => row.SessnId);
+    console.log(`Found ${sessionIds.length} terminate_session:`, sessionIds);
+    for (const session of terminateArray) {
       const targetWs = sessionWsMap.get(session.SessnId);
       if (targetWs && targetWs.readyState === WebSocket.OPEN) {
         const tailoredResponse = {
@@ -179,9 +185,15 @@ async function handleSendMessage(response, ws) {
 
   if (jsonData && jsonData.get_receiver_sessions && jsonData.get_receiver_sessions.receiver_sessions) {
     const receiver_sessions = jsonData.get_receiver_sessions.receiver_sessions;
-    const sessionIds = receiver_sessions.map(row => row.SessnId);
-    console.log(`Found ${sessionIds.length} active sessions:`, sessionIds);
-    for (const session of receiver_sessions) {
+    // const sessionIds = receiver_sessions.map(row => row.SessnId);
+    const receiverArray = Array.isArray(receiver_sessions)
+  ? receiver_sessions
+  : receiver_sessions
+  ? Object.values(receiver_sessions)
+  : [];
+  const sessionIds = receiverArray.map(row => row.SessnId);
+    console.log(`Found ${sessionIds.length} receiver_sessions:`, sessionIds);
+    for (const session of receiverArray) {
       const targetWs = sessionWsMap.get(session.SessnId);
       if (targetWs && targetWs.readyState === WebSocket.OPEN) {
         const tailoredResponse = {
@@ -206,13 +218,27 @@ async function handleSendMessage(response, ws) {
     const active_sessions = jsonData.get_active_sessions.active_sessions;
     const online_users = jsonData.get_online_users.online_users;
     const my_sessions = jsonData.get_my_sessions.my_sessions;
-    const sessionIds = active_sessions.map(row => row.SessnId);
-    console.log(`Found ${sessionIds.length} active sessions:`, sessionIds);
-    for (const session of active_sessions) {
+    // const sessionIds = active_sessions.map(row => row.SessnId);
+    const sessionArray = Array.isArray(active_sessions)
+    ? active_sessions
+    : active_sessions
+    ? Object.values(active_sessions) // convert object to array if needed
+    : [];
+    const sessionIds = sessionArray.map(row => row.SessnId);
+    console.log(`Found ${sessionIds.length} active_sessions:`, sessionIds);
+    for (const session of sessionArray) {
       const targetWs = sessionWsMap.get(session.SessnId);
       if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-        const matched_online_users = online_users.filter(user => user.login === session.User);
-        const matched_my_sessions = my_sessions.filter(user => user.User === session.User);
+        // const matched_online_users = online_users.filter(user => user.login === session.User);
+        const matched_online_users = Array.isArray(online_users)
+  ? online_users.filter(u => u.login === session.User)
+  : Object.values(online_users).filter(u => u.login === session.User);
+
+        // const matched_my_sessions = my_sessions.filter(user => user.User === session.User);
+        const matched_my_sessions = Array.isArray(my_sessions)
+  ? my_sessions.filter(user => user.User === session.User)
+  : Object.values(my_sessions).filter(user => user.User === session.User);
+
         const tailoredResponse = {
           ...response,
           phpOutput: {
@@ -239,12 +265,22 @@ async function handleSendMessage(response, ws) {
   if (jsonData && jsonData.get_sender_messages && jsonData.get_sender_sessions && jsonData.get_sender_messages.sender_messages && jsonData.get_sender_sessions.sender_sessions) {
     const active_sessions = jsonData.get_sender_sessions.sender_sessions;
     const online_users = jsonData.get_sender_messages.sender_messages
-    const sessionIds = active_sessions.map(row => row.SessnId);
-    console.log(`Found ${sessionIds.length} sender sessions:`, sessionIds);
-    for (const session of active_sessions) {
+    // const sessionIds = active_sessions.map(row => row.SessnId);
+    const sessionArray = Array.isArray(active_sessions)
+    ? active_sessions
+    : active_sessions
+    ? Object.values(active_sessions) // convert object to array if needed
+    : [];
+    const sessionIds = sessionArray.map(row => row.SessnId);
+
+    console.log(`Found ${sessionIds.length} sender_sessions:`, sessionIds);
+    for (const session of sessionArray) {
       const targetWs = sessionWsMap.get(session.SessnId);
       if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-        const matched_online_users = online_users.filter(user => user.User === session.User);
+        // const matched_online_users = online_users.filter(user => user.User === session.User);
+        const matched_online_users = Array.isArray(online_users)
+  ? online_users.filter(u => u.User === session.User)
+  : Object.values(online_users).filter(u => u.User === session.User);
         const tailoredResponse = {
           ...response,
           phpOutput: {
@@ -258,20 +294,29 @@ async function handleSendMessage(response, ws) {
         const activejson = JSON.stringify(tailoredResponse);
         targetWs.send(activejson);
         sentCount++;
-        console.log(`Sent message to session ${session.SessnId} for sender ${session.User}`);
+        console.log(`To sender_messages for sender_sessions ${session.SessnId} for sender_user ${session.User}`);
       } else {
-        console.log(`No active WebSocket for session ${session.SessnId} for sender ${session.User}`);
+        console.log(`No sender_messages for sender_sessions ${session.SessnId} for sender_user ${session.User}`);
       }
     }
   } else if (jsonData && jsonData.get_deliver_messages && jsonData.get_deliver_sessions && jsonData.get_deliver_messages.deliver_messages && jsonData.get_deliver_sessions.deliver_sessions) {
     const active_sessions = jsonData.get_deliver_sessions.deliver_sessions;
     const online_users = jsonData.get_deliver_messages.deliver_messages
-    const sessionIds = active_sessions.map(row => row.SessnId);
-    console.log(`Found ${sessionIds.length} active sessions:`, sessionIds);
-    for (const session of active_sessions) {
+    // const sessionIds = active_sessions.map(row => row.SessnId);
+    const sessionArray = Array.isArray(active_sessions)
+    ? active_sessions
+    : active_sessions
+    ? Object.values(active_sessions) // convert object to array if needed
+    : [];
+    const sessionIds = sessionArray.map(row => row.SessnId);
+    console.log(`Found ${sessionIds.length} deliver_sessions:`, sessionIds);
+    for (const session of sessionArray) {
       const targetWs = sessionWsMap.get(session.SessnId);
       if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-        const matched_online_users = online_users.filter(user => user.User === session.User);
+        // const matched_online_users = online_users.filter(user => user.User === session.User);
+        const matched_online_users = Array.isArray(online_users)
+  ? online_users.filter(u => u.User === session.User)
+  : Object.values(online_users).filter(u => u.User === session.User);
         const tailoredResponse = {
           ...response,
           phpOutput: {
@@ -285,9 +330,9 @@ async function handleSendMessage(response, ws) {
         const activejson = JSON.stringify(tailoredResponse);
         targetWs.send(activejson);
         sentCount++;
-        console.log(`Sent message to session ${session.SessnId} for deliver ${session.User}`);
+        console.log(`To deliver_messages for deliver_sessions ${session.SessnId} for deliver_user ${session.User}`);
       } else {
-        console.log(`No active WebSocket for session ${session.SessnId} for deliver ${session.User}`);
+        console.log(`No deliver_messages for deliver_sessions ${session.SessnId} for deliver_user ${session.User}`);
       }
     }
   } else {
@@ -306,41 +351,60 @@ async function processRequest({ ws, jsonData, jsonString, batchId }) {
     // Prepare the PHP command
     // const jsonString = JSON.stringify(jsonData).replace(/'/g, "\\'");
     // const args = ['/var/www/html/chat/email_sync_batch.php', `--param=${jsonString}`];
-    const args = ['C:\\xampp\\htdocs\\6messenger\\omschat\\chatapi.php'];
+    // const args = ['C:\\xampp\\htdocs\\6messenger\\omschat\\chatapi.php'];
     // const args = ['C:\\Users\\supt3\\Desktop\\Deploy\\6messenger\\omschat\\chatapi.php', `--param=${jsonString}`];
     // const args = ['C:\\Users\\supt3\\Desktop\\Deploy\\6messenger\\omschat\\chatapi.php'];
     // const args = ['C:\\xampp\\htdocs\\6messenger\\omschat\\chatapi.php', `--param=${jsonString}`];
-    console.log('Running command:', args);
     // Spawn the PHP process
-    const child = spawn('php', args);
-
+    // const child = spawn('php', args);
+    // const args = ['C:\\xampp\\htdocs\\6messenger\\buzzchat\\buzzapi.js'];
+    // console.log('Running command:', args);
+    // const child = spawn('node', args);
     // Write jsonData as STDIN
-    child.stdin.write(jsonString);
-    child.stdin.end();
+    // child.stdin.write(jsonString);
+    // child.stdin.end();
 
     // Capture PID
-    const pid = child.pid;
-    console.log(`Started process for batch ${batchId} with PID: ${pid}`);
+    // const pid = child.pid;
+    // console.log(`Started process for batch ${batchId} with PID: ${pid}`);
 
     // Store process info
-    activeProcesses.set(pid, { ws, jsonData, batchId, child });
+    // activeProcesses.set(pid, { ws, jsonData, batchId, child });
 
     // Capture output
     let sendResult;
-    let phpOutput = Buffer.alloc(0);
-    child.stdout.on('data', (data) => {
+    // Generate a fake PID for tracking
+    const pid = Date.now() + Math.random();
+
+    console.log(`Started process for batch ${batchId} with PID: ${pid}`);
+
+    // Store process info (no child)
+    activeProcesses.set(pid, { ws, jsonData, batchId });
+
+    // Call processInput directly
+    const result = await processInput(jsonString);
+
+    // Simulate phpOutput as Buffer
+    let phpOutput;
+    if (Buffer.isBuffer(result)) {
+      phpOutput = result;
+    } else {
+      phpOutput = Buffer.from(JSON.stringify(result));
+    }
+    // let phpOutput = Buffer.alloc(0);
+    // child.stdout.on('data', (data) => {
       // phpOutput += data.toString();
-      phpOutput = Buffer.concat([phpOutput, data]);
+      // phpOutput = Buffer.concat([phpOutput, data]);
       // phpOutput += data;
-    });
-    child.stderr.on('data', (data) => {
+    // });
+    // child.stderr.on('data', (data) => {
       // phpOutput += data.toString();
-      phpOutput = Buffer.concat([phpOutput, data]);
+      // phpOutput = Buffer.concat([phpOutput, data]);
       // phpOutput += data;
-    });
+    // });
     // console.log('Received JSON:', jsonData);
     // Handle process exit
-    child.on('close', async (code) => {
+    // child.on('close', async (code) => {
       let jsonphp = {};
       try {
         if (phpOutput.length >= 4) {
@@ -353,8 +417,9 @@ async function processRequest({ ws, jsonData, jsonString, batchId }) {
             jsonphp = JSON.parse(headerJson);
             console.log('Chunk size:', chunkBuffer.length);
           } else {
-            // console.error('Raw Output:', phpOutput.toString());
-            const cleanedOutput = phpOutput.toString().trim().replace(/^"|"$/g, '').replace(/\\"/g, '"')
+            console.error('Raw Output:', phpOutput.toString());
+            const cleanedOutput = phpOutput.toString().trim();
+            // .replace(/^"|"$/g, '').replace(/\\"/g, '"')
             jsonphp = JSON.parse(cleanedOutput);
           }
         } else {
@@ -366,7 +431,7 @@ async function processRequest({ ws, jsonData, jsonString, batchId }) {
         console.error(`Error parsing JSON from PHP output:`, e);
         // console.error('Raw Output:', phpOutput);  // Helps debugging
       }
-      console.log(`Process for batch ${batchId} with PID ${pid} finished with code ${code}, output:`, jsonphp);
+      console.log(`Process for batch ${batchId} with PID ${pid} finished with output:`, jsonphp);
 
       const response = {
         status: 'completed',
@@ -402,7 +467,7 @@ async function processRequest({ ws, jsonData, jsonString, batchId }) {
 
       // Process next queued request
       processNextFromQueue();
-    });
+    // });
 
   } catch (error) {
     console.error(`Error processing batch ${batchId}:`, error);
@@ -455,6 +520,8 @@ function parseBinaryMessage(binaryBuffer) {
   return { header, chunkBuffer };
 }
 
+// Enable raw mode to capture keypresses only if stdin is a TTY
+if (process.stdin.isTTY) {
 // Enable raw mode to capture keypresses
 readline.emitKeypressEvents(process.stdin);
 process.stdin.setRawMode(true);
@@ -488,49 +555,50 @@ process.stdin.on('keypress', (str, key) => {
     process.exit(); // Allow Ctrl+C to exit the server
   }
 });
+}
 
-function triggerResetStatus() {
-  return new Promise((resolve, reject) => {
-    const batchId = Date.now().toString();
-    const resetJson = {
-      action: 'reset_status',
-      batchId: batchId
-    };
-    const jsonString = JSON.stringify(resetJson);
+async function triggerResetStatus() {
+  const batchId = Date.now().toString();
+  const resetJson = { action: 'reset_status', batchId };
+  const jsonString = JSON.stringify(resetJson);
 
     console.log('Starting reset_status command…');
-    const args = ['C:\\xampp\\htdocs\\6messenger\\omschat\\chatapi.php'];
+    // const args = ['C:\\xampp\\htdocs\\6messenger\\omschat\\chatapi.php'];
+    // const args = ['C:\\xampp\\htdocs\\6messenger\\buzzchat\\buzzapi.js'];
+    // const child = spawn('node', args);
     // const args = ['C:\\Users\\supt3\\Desktop\\Deploy\\6messenger\\omschat\\chatapi.php'];
-    const child = spawn('php', args);
-    child.stdin.write(jsonString);
-    child.stdin.end();
+    // const child = spawn('php', args);
+    // child.stdin.write(jsonString);
+    // child.stdin.end();
     // Capture PID
     // const pid = child.pid;
     // console.log(`Started process for batch ${batchId} with PID: ${pid}`);
-
+    const result = await processInput(jsonString);
     // // Store process info
     // activeProcesses.set(pid, { ws: null, jsonString, batchId, child });
-    let output = '';
-    child.stdout.on('data', (data) => {
+    // let output = '';
+    // child.stdout.on('data', (data) => {
       // console.log('Reset status output:', data.toString());
-      output += data.toString();
-    });
+      // output += data.toString();
+    // });
 
-    child.stderr.on('data', (data) => {
+    // child.stderr.on('data', (data) => {
       // console.error('Reset status error:', data.toString());
-      output += data.toString();
-    });
+//       output += data.toString();
+//     });
 
-    child.on('close', (code) => {
-      console.log(`Reset status process exited with code ${code} output:\n${output}`);
-      resolve();
-    });
-    console.log('Ending reset_status command…');
-  });
+//     child.on('close', (code) => {
+      console.log(`Reset status process exited with output:\n${result}`);
+//       resolve();
+//     });
+//     console.log('Ending reset_status command…');
+  // });
 }
 
-console.log('WebSocket server running on ws://localhost:3000');
+console.log('WebSocket server running on ws://localhost:5173');
 
 triggerResetStatus().then(() => {
   console.log('Reset status completed.');
 });
+
+import { processInput } from './buzzapi.js';
