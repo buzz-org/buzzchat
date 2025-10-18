@@ -51,6 +51,8 @@ class WebSocketChat {
         // Login elements
         this.loginModal = document.getElementById('loginModal');
         this.usernameInput = document.getElementById('usernameInput');
+        this.passwordInput = document.getElementById('passwordInput');
+        this.passwordToggleBtn = document.getElementById('passwordToggleBtn');
         this.loginBtn = document.getElementById('loginBtn');
         this.loginError = document.getElementById('loginError');
         
@@ -127,6 +129,10 @@ class WebSocketChat {
         this.usernameInput.addEventListener('keypress', (e) => {
             if (e.key == 'Enter') this.handleLogin();
         });
+        this.passwordInput.addEventListener('keypress', (e) => {
+            if (e.key == 'Enter') this.handleLogin();
+        });
+        this.passwordToggleBtn.addEventListener('click', () => this.togglePasswordVisibility());
 
         // Message events
         this.sendBtn.addEventListener('click', () => this.sendMessage());
@@ -552,13 +558,37 @@ class WebSocketChat {
     }
 
     /**
+     * Toggle password visibility
+     */
+    togglePasswordVisibility() {
+        const eyeIcon = this.passwordToggleBtn.querySelector('.eye-icon');
+        const eyeOffIcon = this.passwordToggleBtn.querySelector('.eye-off-icon');
+
+        if (this.passwordInput.type === 'password') {
+            this.passwordInput.type = 'text';
+            eyeIcon.style.display = 'none';
+            eyeOffIcon.style.display = 'block';
+        } else {
+            this.passwordInput.type = 'password';
+            eyeIcon.style.display = 'block';
+            eyeOffIcon.style.display = 'none';
+        }
+    }
+
+    /**
      * Handle login process
      */
     handleLogin() {
         const username = this.usernameInput.value.trim();
-        
+        const password = this.passwordInput.value.trim();
+
         if (!username) {
             this.showLoginError('Please enter a username');
+            return;
+        }
+
+        if (!password) {
+            this.showLoginError('Please enter a password');
             return;
         }
 
@@ -566,8 +596,8 @@ class WebSocketChat {
         this.sessionId = this.generateSessionId();
         this.loginError.textContent = '';
         this.loginBtn.disabled = true;
-        this.loginBtn.textContent = 'Connecting...';
-        
+        this.loginBtn.textContent = 'Signing In...';
+
         this.connect();
     }
 
