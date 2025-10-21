@@ -1540,9 +1540,11 @@ async function signuptoken(data, db) {
 
     const response = await db.execQuery(query, params);
     const clientObj = JSON.parse(response.result[0].ClientToken);
-    const clientId = clientObj?.web?.client_id;
+    const clientId = clientObj?.client_id || '';
+    const tenantId = clientObj?.tenant_id || '';
+    const redirect = clientObj?.redirect_uris || [];
 
-    const finalmsg =  { status: "success", code: 1, message: 'Clientid successfull', clientid: clientId || '' };
+    const finalmsg =  { status: "success", code: 1, message: 'ClientToken successfull', clientid: clientId, tenantid: tenantId, redirect: redirect };
 
     return finalmsg;
 }

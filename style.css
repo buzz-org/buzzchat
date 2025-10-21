@@ -93,6 +93,12 @@ body {
     position: relative;
 }
 
+.signup-modal-content {
+    width: 900px;
+    max-width: 95vw;
+    position: relative;
+}
+
 .theme-toggle-container {
     position: absolute;
     top: 10rem;
