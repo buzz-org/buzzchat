@@ -42,6 +42,22 @@ app.post("/buzzapi", async (req, res) => {
   }
 });
 
+// app.get('/buzzoauth', (req, res) => {
+//   const appname = getCurrentUrl(req);
+  
+//   if (secretPath.web.redirect_uris.includes(appname)) {
+//     const REDIRECT_URI = appname; // like define('REDIRECT_URI', $appname)
+//     res.json({ status: 'ok', redirect_uri: REDIRECT_URI });
+//   } else {
+//     res.status(400).json({
+//       status: 'error',
+//       code: 0,
+//       message: 'Invalid redirect uri.',
+//       uri: appname
+//     });
+//   }
+// });
+
 // Create an HTTP server
 const server = http.createServer(app);
 

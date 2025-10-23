@@ -1540,13 +1540,204 @@ async function signuptoken(data, db) {
 
     const response = await db.execQuery(query, params);
     const clientObj = JSON.parse(response.result[0].ClientToken);
-    const clientId = clientObj?.client_id || '';
-    const tenantId = clientObj?.tenant_id || '';
-    const redirect = clientObj?.redirect_uris || [];
 
-    const finalmsg =  { status: "success", code: 1, message: 'ClientToken successfull', clientid: clientId, tenantid: tenantId, redirect: redirect };
+    const action = data.action || '';   let finalmsg; // Declare here
+
+    if (action == 'signuptoken') {
+        const clientId = clientObj?.client_id || '';
+        const tenantId = clientObj?.tenant_id || '';
+        const redirect = clientObj?.redirect_uris || [];
+
+        finalmsg =  { status: "success", code: 1, message: 'ClientToken successfull', clientid: clientId, tenantid: tenantId, redirect: redirect };
+    } else {
+        finalmsg =  { status: "success", code: 1, message: 'ClientToken successfull', clientToken: clientObj };
+    }
 
     return finalmsg;
+}
+
+async function exchangeauth(data, db) {
+    const signupid = data.signupid || '';
+    if (!signupid) return { status: "failed", code: 0, message: 'Signupid is required' };
+
+    const authCode = data.authCode || '';
+    if (!authCode) return { status: "failed", code: 0, message: 'Authcode is required' };
+    
+    const clientdtl = await signuptoken(data, db);  let gauth;
+
+    if ( signupid == 2 ) {
+        gauth = await googl_token(clientdtl, data, db);
+    } else if ( signupid == 3 ) {
+        gauth = await micro_token(clientdtl, data, db);
+    }
+
+    const finalmsg =  { status: "success", code: 1, message: 'ClientToken successfull', response: gauth };
+
+    return finalmsg;
+}
+
+async function googl_token(clientdtl, data, db) {
+    const clientObj = clientdtl.clientToken;
+    const clientId = clientObj?.client_id || '';
+    const clientSt = clientObj?.client_secret || '';
+    const redirect = clientObj?.redirect_uris || [];
+    const tokenuri = clientObj?.token_uri || [];
+    const userinfo = clientObj?.userinfo_uri || '';
+    const authCode = data.authCode;
+
+    const postFields = {
+        code: authCode,
+        client_id: clientId,
+        client_secret: clientSt,
+        redirect_uri: redirect[0],
+        grant_type: 'authorization_code'
+    };
+
+    const response = await fetch(tokenuri, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(postFields)
+        });
+
+    const request = await response.json();  const accessToken = request.access_token;
+
+    const resp = await fetch(userinfo, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const user = await resp.json(); const url = user.picture;
+
+    const picture = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      // If HTTPS issues, uncomment below (for self-signed certs)
+      // agent: new (await import("https")).Agent({ rejectUnauthorized: false })
+    });
+
+    const httpCode = picture.status;
+    const headers = picture.headers;
+    const arrayBuffer = await picture.arrayBuffer();
+    const body = Buffer.from(arrayBuffer);
+    let filename = null;
+
+    // Extract filename from Content-Disposition header
+    const contentDisposition = headers.get("content-disposition");
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (match) filename = match[1];
+    }
+
+    user.picture = body.toString("base64"); user.filename = filename;
+    return user;
+}
+
+async function getCurrentUrl(req) {
+  const protocol = req.headers['x-forwarded-proto']
+    ? `${req.headers['x-forwarded-proto']}://`
+    : req.secure
+      ? 'https://'
+      : 'http://';
+
+  const host = req.headers.host;
+  const requestUri = req.originalUrl.split('?')[0]; // like $_SERVER['SCRIPT_NAME'] in PHP
+
+  return protocol + host + requestUri;
+}
+
+async function micro_token(clientdtl, data, db) {
+    const clientObj = clientdtl.clientToken;
+    const clientId = clientObj?.client_id || '';
+    const tenantId = clientObj?.tenant_id || '';
+    const clientSt = clientObj?.client_secret || '';
+    const redirect = clientObj?.redirect_uris || [];
+    const auth_uri = clientObj?.auth_uri || '';
+    const tokenend = clientObj?.token_end || '';
+    const tokenuri = auth_uri + tenantId + tokenend || '';
+    const userinfo = clientObj?.userinfo_uri || '';
+    const authscopes = clientObj?.auth_scopes || '';
+    const pictureuri = clientObj?.picture_uri || '';
+    const authCode = data.authCode;
+
+    const postFields = {
+        code: authCode,
+        client_id: clientId,
+        client_secret: clientSt,
+        redirect_uri: redirect[0],
+        grant_type: 'authorization_code',
+        scope: authscopes
+    };
+
+    const response = await fetch(tokenuri, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(postFields)
+        });
+
+    const request = await response.json();  const accessToken = request.access_token;
+
+    const resp = await fetch(userinfo, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    const user = await resp.json(); // const url = user.picture;
+
+    const picture = await fetch(pictureuri, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const httpCode = picture.status;
+    const contentType = picture.headers.get("content-type");
+    const buffer = await picture.arrayBuffer();
+
+    const extension = (() => {
+      switch (contentType) {
+        case "image/jpeg": return "jpg";
+        case "image/png": return "png";
+        case "image/gif": return "gif";
+        default: return "bin";
+      }
+    })();
+
+    const filename = `unnamed.${extension}`;
+
+    user.picture = Buffer.from(buffer).toString("base64"); user.filename = filename;
+    return user;
+}
+
+async function checkInternetConnection(email) {
+    const dns = require('dns');
+
+    dns.lookup('google.com', (err) => {
+        if (err) {
+            const otp = generateOtp(6);
+            return finalmsg = { status: "failed", code: 0, message: `No internet connection to send email, Your OTP is ${otp.otp} and is valid for 15 minutes.` };
+        } else {
+            return finalmsg = { status: "success", code: 1, message: 'Internet connection is available.' };
+        }
+    });
+}
+
+async function generateOtp(length) {
+    let otp = '';
+    for (let i = 0; i < length; i++) {
+        otp += Math.floor(Math.random() * 10); // generates a digit from 0–9
+    }
+
+    return finalmsg = { status: "success", code: 1, message: "Otp generated successfully.", otp: otp
+    };
+}
+
+async function googl_send(email)
+{
+
+}
+
+async function micro_send(email)
+{
+
 }
 
 export default {
@@ -1580,5 +1771,11 @@ export default {
   get_chats,
   login,
   chatsignup,
-  signuptoken
+  signuptoken,
+  exchangeauth,
+  getCurrentUrl,
+  googl_token,
+  micro_token,
+  checkInternetConnection,
+  generateOtp
 };

@@ -189,6 +189,9 @@ async function processInput(inputBuffer) {
             case 'signuptoken':
                 logmsg.signupoptions = await chatapi.signuptoken(data, db);
                 break;
+            case 'exchangeauth':
+                logmsg.exchangeauth = await chatapi.exchangeauth(data, db);
+                break;
 
             // case related to mail
 
