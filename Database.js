@@ -76,6 +76,7 @@ export class Database {
 
             const [rows, fields] = await connection.query(query, params);
             // logerror(rows, 'execQuery');
+            // console.log(rows);
             // Handle multiple result sets
             // const result = Array.isArray(rows) ? [rows] : rows;
             // const result = Array.isArray(rows) ? rows : [rows];

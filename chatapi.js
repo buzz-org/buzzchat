@@ -1539,7 +1539,7 @@ async function signuptoken(data, db) {
     const params = [signupid];
 
     const response = await db.execQuery(query, params);
-    const clientObj = JSON.parse(response.result[0].ClientToken);
+    const clientObj = JSON.parse(response?.result?.[0]?.ClientToken || '{}');
 
     const action = data.action || '';   let finalmsg; // Declare here
 
@@ -1560,12 +1560,15 @@ async function exchangeauth(data, db) {
     const signupid = data.signupid || '';
     if (!signupid) return { status: "failed", code: 0, message: 'Signupid is required' };
 
-    const authCode = data.authCode || '';
-    if (!authCode) return { status: "failed", code: 0, message: 'Authcode is required' };
-    
+    if ( signupid != 1 ) {
+        const authCode = data.authCode || '';
+        if (!authCode) return { status: "failed", code: 0, message: 'Authcode is required' };
+    }
     const clientdtl = await signuptoken(data, db);  let gauth;
 
-    if ( signupid == 2 ) {
+    if ( signupid == 1 ) {
+        gauth = await email_token(clientdtl, data, db);
+    } else if ( signupid == 2 ) {
         gauth = await googl_token(clientdtl, data, db);
     } else if ( signupid == 3 ) {
         gauth = await micro_token(clientdtl, data, db);
@@ -1707,17 +1710,33 @@ async function micro_token(clientdtl, data, db) {
     return user;
 }
 
-async function checkInternetConnection(email) {
-    const dns = require('dns');
+async function email_token(clientdtl, data, db) {
+    const emailId = data.emailId || '';
+    if (!emailId) return { status: "failed", code: 0, message: 'Emailid is required.' };
 
-    dns.lookup('google.com', (err) => {
-        if (err) {
-            const otp = generateOtp(6);
-            return finalmsg = { status: "failed", code: 0, message: `No internet connection to send email, Your OTP is ${otp.otp} and is valid for 15 minutes.` };
-        } else {
-            return finalmsg = { status: "success", code: 1, message: 'Internet connection is available.' };
-        }
+    const signupid = data.signupid || '';
+    const otp = await generateOtp(6); 
+    const timestamp = new Date(Date.now() + (5.5 * 60 * 60 * 1000)).toISOString().slice(0, 19).replace('T', ' ');
+
+    const query = `SELECT TemplateId FROM user_prefs WHERE PrefId = ?; INSERT INTO signupauthotp (EmailId, Otp, GeneratedDtTm, SignUpId) VALUES (?, ?, ?, ?);`;
+    const params = ['1', emailId, otp.otp, timestamp, signupid];
+
+    const request = await db.execQuery(query, params);  const response = request.result;
+
+    const dns = await import('dns');
+
+    const hasInternet = await new Promise((resolve) => {
+        dns.lookup('google.com', (err) => {
+        resolve(!err);
+        });
     });
+
+    if (!hasInternet) {
+        return { status: "failed", code: 0, message: `No internet connection to send email, Your OTP is ${otp.otp} and is valid for 15 minutes.`, result: response, otp: otp };
+    } else {
+        const emlotp = await email_send(response[1].insertId, otp.otp, db, response[0][0].TemplateId);
+        return { status: "success", code: 1, message: 'Internet connection is available.', result: response, otp: otp, emlotp: emlotp };
+    }
 }
 
 async function generateOtp(length) {
@@ -1726,8 +1745,58 @@ async function generateOtp(length) {
         otp += Math.floor(Math.random() * 10); // generates a digit from 0–9
     }
 
-    return finalmsg = { status: "success", code: 1, message: "Otp generated successfully.", otp: otp
+    return { status: "success", code: 1, message: "Otp generated successfully.", otp: otp
     };
+}
+
+async function email_send(pk_id, usr_login, db, emltmpl) {
+    const query = `SELECT DATABASE() AS DB; SELECT a.EmailPrefId, a.EmailPrefName, a.EmailOnOff, a.EmailSend, a.EmailFolder, a.LibraryPath, a.EmailPath, a.EmailLogFile, a.IsRecClosed, a.EmailCurl FROM emailpreference a WHERE a.EmailPrefId = ?; INSERT INTO emailloghd (LogType, CreatedBy) VALUES (?, ?)`; const params = ['1', '2', usr_login];
+
+    const request = await db.execQuery(query, params); let hdrlog = []; const response = request.result;
+    let logmsg = { status: "success", code: 1, message: "Starting trouble.", details: "Not going forward." };
+
+    const arr_pref = response[0]; // object inside first array
+    const arr_db = response[1][0]; // object inside second array
+    const daba = arr_pref.DB = arr_db.DB
+    const arr_lid = response[2];    // last plain object
+    const lid = arr_lid.insertId;
+
+    if (pk_id && usr_login) {
+        [logmsg, hdrlog] = await pref_check(pk_id, usr_login, arr_pref, logmsg, hdrlog);
+    } else {
+        logmsg = { status: "failed", code: 0, message: "primary key or username not set.", details: "Either primary key or username not set." };
+
+    }
+    return logmsg;
+}
+
+async function pref_check(pk_id, usr_login, arr_pref, logmsg, hdrlog) {
+    const EmailPrefId   = arr_pref[0].EmailPrefId;
+    const EmailPrefName = arr_pref[0].EmailPrefName;
+    const EmailOnOff    = arr_pref[0].EmailOnOff;
+    const EmailFolder   = arr_pref[0].EmailFolder;
+    const LibraryPath   = arr_pref[0].LibraryPath;
+    const EmailPath     = arr_pref[0].EmailPath;
+    const EmailLogFile  = arr_pref[0].EmailLogFile;
+    const EmailSend     = arr_pref[0].EmailSend;
+    const EPRClosed     = arr_pref[0].EPRClosed;
+    const EmailCurl     = arr_pref[0].EmailCurl;
+
+    if (arr_pref.length == 0) {
+        logmsg = { status: "failed", code: 0, message: "Email configuration is empty.", details: "Email configuration is empty." };
+    } else if (EmailOnOff != 1) {
+        logmsg = { status: "failed", code: 0, message: "Email feature is disabled.", details: "Email feature is disabled." };
+    } else if (EmailSend != 1) {
+        logmsg = { status: "failed", code: 0, message: "Email sending is disabled.", details: "Email sending is disabled." };
+    } else if (EPRClosed != 0) {
+        logmsg = { status: "failed", code: 0, message: "Email preference is closed.", details: "Email preference is closed." };
+    } else {
+        const query = "SET SESSION group_concat_max_len = 1000000;";    const params = [];
+        const response = await db.execQuery(query, params); // assuming async DB call
+        // [logmsg, hdrlog] = await bulk_loop(pk_id, usr_login, arr_pref, logmsg, hdrlog);
+    }
+
+    return [logmsg, hdrlog];
 }
 
 async function googl_send(email)
@@ -1776,6 +1845,8 @@ export default {
   getCurrentUrl,
   googl_token,
   micro_token,
-  checkInternetConnection,
-  generateOtp
+  generateOtp,
+  email_token,
+  googl_send,
+  micro_send
 };
