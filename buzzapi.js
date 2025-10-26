@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import express from 'express';
 import bodyParser from 'body-parser';
-import { Database } from './Database.js';
+import db from './Database.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import mailapi from './mailapi.js';
@@ -82,8 +82,8 @@ async function processInput(inputBuffer) {
         }
 
         const action = data.action || '';
-        const db = new Database();
-        await db.connect();
+        // const db = new Database();
+        // await db.connect();
 
         switch (action) {
             // case related to chat
@@ -204,7 +204,7 @@ async function processInput(inputBuffer) {
                 break;
         }
 
-        await db.closeConnection();
+        // await db.closeConnection();
 
         let output;
         if (chunkDown.length > 0) {
