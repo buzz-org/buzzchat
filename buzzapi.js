@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import mailapi from './mailapi.js';
 import chatapi from './chatapi.js';
+import signup from './signup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -184,13 +185,13 @@ async function processInput(inputBuffer) {
                 logmsg.terminate_session = await chatapi. terminate_session(data, db);
                 break;
             case 'chatsignup':
-                logmsg.signupoptions = await chatapi.chatsignup(data, db);
+                logmsg.signupoptions = await signup.chatsignup(data, db);
                 break;
             case 'signuptoken':
-                logmsg.signupoptions = await chatapi.signuptoken(data, db);
+                logmsg.signupoptions = await signup.signuptoken(data, db);
                 break;
             case 'exchangeauth':
-                logmsg.exchangeauth = await chatapi.exchangeauth(data, db);
+                logmsg.exchangeauth = await signup.exchangeauth(data, db);
                 break;
 
             // case related to mail
