@@ -197,7 +197,19 @@ async function processInput(inputBuffer) {
             // case related to mail
 
             case 'mailsignup':
-                logmsg.signupoptions = await mailapi.mailsignup(data, db);
+                logmsg.signupoptions = await mailapi.mailsignup(data);
+                break;
+
+            case 'getemlids':
+                logmsg.getemlids = await mailapi.getemlids(data);
+                break;
+
+            case 'getmsgids':
+                logmsg.getmsgids = await mailapi.getmsgids(data);
+                break;
+
+            case 'batch_getmsg':
+                logmsg.batch_getmsg = await mailapi.batch_getmsg(data);
                 break;
 
             default:
