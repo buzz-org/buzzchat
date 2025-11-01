@@ -75,7 +75,7 @@ const sessionWsMap = new Map(); // Maps sessionid to ws
 const requestQueue = [];
 let runningProcesses = 0;
 let jsonData, batchId, jsonString;
-const MAX_CONCURRENT = 100;
+const MAX_CONCURRENT = 10;
 
 // const wss = new WebSocket.Server({ port: 3000 });
 

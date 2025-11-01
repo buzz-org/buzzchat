@@ -237,7 +237,7 @@ async function processInput(inputBuffer) {
 }
 
 // Export the processInput function
-export { processInput };
+export { processInput, logerror };
 
 function logerror(logmsg, cstmsg) {
     let errmsg = `[ ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })} ] [ ${cstmsg} ]`;

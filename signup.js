@@ -81,7 +81,7 @@ async function googl_token(clientdtl, data, db) {
         grant_type: 'authorization_code'
     };
 
-    const request = await node_fetch(tokenuri, { 'Content-Type': 'application/x-www-form-urlencoded' }, new URLSearchParams(postFields));
+    const request = await node_fetch(tokenuri, "POST", { 'Content-Type': 'application/x-www-form-urlencoded' }, new URLSearchParams(postFields));
 
     const accessToken = request.access_token;
 
@@ -159,7 +159,7 @@ async function micro_token(clientdtl, data, db) {
         scope: authscopes
     };
 
-    const request = await node_fetch(tokenuri, { 'Content-Type': 'application/x-www-form-urlencoded' }, new URLSearchParams(postFields));
+    const request = await node_fetch(tokenuri, "POST", { 'Content-Type': 'application/x-www-form-urlencoded' }, new URLSearchParams(postFields));
 
     const accessToken = request.access_token;
 
@@ -643,7 +643,7 @@ async function googl_send(usr_login, logmsg, hdrlog, arr_temp, arr_auth, i) {
     const expireat = accessObj?.expires_at || '';
 
     if (expireat && refrestn && Math.floor(Date.now() / 1000) > expireat) {
-        [logmsg, accessObj] = await googl_refresh(arr_temp, clientObj, accessObj, usr_login);
+        logmsg = await googl_refresh(arr_temp, usr_login);  accessObj = logmsg.token;
         [logmsg, hdrlog] = await GmailSend(clientObj, accessObj, logmsg, hdrlog, i);
     } else if (accesstn) {
         [logmsg, hdrlog] = await GmailSend(clientObj, accessObj, logmsg, hdrlog, i);
@@ -654,7 +654,18 @@ async function googl_send(usr_login, logmsg, hdrlog, arr_temp, arr_auth, i) {
     return [logmsg, hdrlog];
 }
 
-async function googl_refresh(arr_temp, clientObj, accessObj, usr_login) {
+async function googl_refresh(arr_temp, usr_login) {
+    const serproid = arr_temp[0].serproid;
+    const serproname = arr_temp[0].serproname;
+    const ClientSecret = arr_temp[0].ClientSecret;
+
+    const addresid = arr_temp[0].addresid;
+    const addresname = arr_temp[0].addresname;
+    const AddressToken = arr_temp[0].AddressToken;
+
+    const clientObj = JSON.parse(ClientSecret || '{}');
+    let accessObj = JSON.parse(AddressToken || '{}');
+
     const clientId = clientObj?.client_id || '';
     const clientSt = clientObj?.client_secret || '';
     const cliscope = clientObj?.mail_scopes || '';
@@ -671,7 +682,7 @@ async function googl_refresh(arr_temp, clientObj, accessObj, usr_login) {
         grant_type: 'refresh_token'
     };
 
-    const data = await node_fetch(tokenuri, { "Content-Type": "application/x-www-form-urlencoded" }, new URLSearchParams(postFields));
+    const data = await node_fetch(tokenuri, "POST", { "Content-Type": "application/x-www-form-urlencoded" }, new URLSearchParams(postFields));
 
     const queryParams = new URLSearchParams({
         client_id: clientId,
@@ -694,29 +705,28 @@ async function googl_refresh(arr_temp, clientObj, accessObj, usr_login) {
     data.AUTH_URL = oauthurl;
     data.redirect_uris = redirect;
     data.refresh_token = refrestn;
-
-    const serproid = arr_temp[0].serproid;
-    const serproname = arr_temp[0].serproname;
-    const ClientSecret = arr_temp[0].ClientSecret;
-
-    const addresid = arr_temp[0].addresid;
-    const addresname = arr_temp[0].addresname;
-    const AddressToken = arr_temp[0].AddressToken;
+    data.serproid = serproid;
+    data.serproname = serproname;
+    data.addresid = addresid;
+    data.addresname = addresname;
 
     const logmsg = { status: "success", code: 1, message: "Refreshed successfully.", token: data, addresname: addresname, details: "Refreshed", serproid: serproid, usr_login: usr_login };
 
     await insert_token(logmsg);
 
-    return [logmsg, data];
+    return logmsg;
 }
 
-async function node_fetch(url, headers, body) {
-    const response = await fetch(url, {
-        method: "POST",
-        headers: headers,
-        body: body,
-    });
-
+async function node_fetch(url, method, headers, body) {
+    const options = {
+        method,
+        headers,
+    };
+    // Only include body if it's NOT a GET or HEAD request
+    if (body && !['GET', 'HEAD'].includes(method.toUpperCase())) {
+        options.body = body;
+    }
+    const response = await fetch(url, options);
     const text = await response.text();
     let data;   console.log(text);
     try { data = JSON.parse(text); } catch { data = text; }
@@ -748,13 +758,13 @@ async function GmailSend(clientObj, accessObj, logmsg, hdrlog, i) {
         "Authorization": "Bearer " + accesstn
     };
 
-    const crtresp = await node_fetch(crtdraft, headers, crtbody);
+    const crtresp = await node_fetch(crtdraft, "POST", headers, crtbody);
 
     const sndbody = JSON.stringify({
         id: crtresp.id
     });
 
-    const sndresp = await node_fetch(snddraft, headers, sndbody);
+    const sndresp = await node_fetch(snddraft, "POST", headers, sndbody);
 
     hdrlog = { status: "success", code: 1, message: "Sent successfully.", crtdraft: crtresp, snddraft: sndresp, accessObj: accessObj, clientObj: clientObj };
 
@@ -960,7 +970,7 @@ async function micro_refresh(arr_temp, clientObj, accessObj, usr_login) {
         grant_type: 'refresh_token'
     };
 
-    const data = await node_fetch(tokenuri, { "Content-Type": "application/x-www-form-urlencoded" }, new URLSearchParams(postFields));
+    const data = await node_fetch(tokenuri, "POST", { "Content-Type": "application/x-www-form-urlencoded" }, new URLSearchParams(postFields));
 
     const queryParams = new URLSearchParams({
         client_id: clientId,
@@ -1009,11 +1019,11 @@ async function OutlookSend(clientObj, accessObj, logmsg, hdrlog, i) {
         "Authorization": "Bearer " + accesstn
     };
 
-    const crtresp = await node_fetch(crtdraft, headers, crtbody);
+    const crtresp = await node_fetch(crtdraft, "POST", headers, crtbody);
 
     const sndbody = JSON.stringify({}); const rdydraft = snddraft.replace('{id}', crtresp.id);
 
-    const sndresp = await node_fetch(rdydraft, headers, sndbody);
+    const sndresp = await node_fetch(rdydraft, "POST", headers, sndbody);
 
     hdrlog = { status: "success", code: 1, message: "Sent successfully.", crtdraft: crtresp, snddraft: sndresp, accessObj: accessObj, clientObj: clientObj };
 
@@ -1196,5 +1206,8 @@ export default {
     googl_token,
     micro_token,
     generateOtp,
-    email_token
+    email_token,
+
+    googl_refresh,
+    node_fetch
 }

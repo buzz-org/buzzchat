@@ -2,6 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import db from './Database.js';
+import { logerror } from './buzzapi.js';
 
 async function terminate_session(data, db) {
     const username = data.username || '';
@@ -1480,6 +1481,7 @@ async function login(data, db) {
 
     const checkQuery = "SELECT login, name FROM sec_users WHERE BINARY login = ?";
     const checkResponse = await db.execQuery(checkQuery, [username]);
+    // logerror(checkResponse, 'checkResponse');
     const rows = checkResponse.result[0];
     const user = rows[0] || null;
 
